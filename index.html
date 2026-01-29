@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B.Tech Project - High Intensity Catching Game</title>
+    <style>
+        body { margin: 0; background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Arial', sans-serif; }
+        #game-container { position: relative; border: 5px solid #32CD32; border-radius: 10px; }
+        canvas { display: block; background-color: #111; }
+        #ui-layer { position: absolute; top: 20px; left: 20px; color: #fff; pointer-events: none; width: 90%; }
+        .project-title { position: absolute; top: -40px; width: 100%; text-align: center; color: #FFD700; font-weight: bold; font-size: 20px; }
+        #gameOverScreen { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-align: center; display: none; background: rgba(0,0,0,0.9); padding: 30px; border-radius: 15px; border: 3px solid red; pointer-events: auto; z-index: 10; }
+        button { background: #32CD32; border: none; padding: 12px 25px; cursor: pointer; font-weight: bold; margin-top: 15px; border-radius: 5px; font-size: 16px; transition: 0.3s; }
+        button:hover { background: #28a428; transform: scale(1.1); }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div class="project-title">B.tech final year project</div>
+    <div id="ui-layer">
+        <h2 id="scoreLabel">Score: 0</h2>
+    </div>
+    
+    <div id="gameOverScreen">
+        <h1 style="color: red; font-size: 40px;">CRASHED!</h1>
+        <p id="finalScore" style="font-size: 20px;"></p>
+        <button onclick="resetGame()">Try Again</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreLabel = document.getElementById('scoreLabel');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const finalScoreText = document.getElementById('finalScore');
+
+    canvas.width = 600;
+    canvas.height = 700;
+
+    let score = 0;
+    let gameActive = true;
+    let items = [];
+    
+    // --- INTENSITY CONFIGURATION ---
+    let baseSpeed = 7;        // Speed ab 5 se badha kar 7 kar di hai
+    let spawnRate = 800;      // Items ab har 0.8s mein aayenge (pehle 1s tha)
+    let spawnTimer;
+
+    // --- Image Handling ---
+    const playerImg = new Image();
+    playerImg.src = 'player.webp'; 
+    const objectImg = new Image();
+    objectImg.src = 'object.jpg'; 
+
+    let playerLoaded = false;
+    let objectLoaded = false;
+    playerImg.onload = () => playerLoaded = true;
+    objectImg.onload = () => objectLoaded = true;
+
+    // Player Object
+// Player Object (Size badha kar 120x120 kar diya hai)
+    const player = { 
+        x: canvas.width / 2 - 60, // Center alignment fix (width ka aadha)
+        y: canvas.height - 140,   // Thoda upar taaki bada size screen se bahar na dikhe
+        width: 120,               // New Width
+        height: 120,              // New Height
+        speed: 18                 // Speed thodi aur badha di taaki bada object move karne mein heavy na lage
+    };
+    function createItem() {
+        if (!gameActive) return;
+        
+        // Intensity logic: Score badhne par ek saath 1 se zyada objects girenge
+        const count = score > 500 ? 3 : (score > 200 ? 2 : 1);
+        
+        for(let i = 0; i < count; i++) {
+            const xPos = Math.random() * (canvas.width - 50);
+            // Har item ki apni speed hogi jo score ke saath badhegi
+            const currentSpeed = baseSpeed + (score / 150); 
+            items.push({ x: xPos, y: -50 - (i * 100), width: 50, height: 50, speed: currentSpeed });
+        }
+    }
+
+    let keys = {};
+    window.addEventListener('keydown', (e) => keys[e.code] = true);
+    window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+    function resetGame() {
+        score = 0;
+        items = [];
+        gameActive = true;
+        player.x = canvas.width / 2 - 40;
+        scoreLabel.innerText = "Score: 0";
+        gameOverScreen.style.display = "none";
+        
+        // Restart spawning
+        clearInterval(spawnTimer);
+        spawnTimer = setInterval(createItem, spawnRate);
+        
+        gameLoop();
+    }
+
+    function update() {
+        if (!gameActive) return;
+
+        if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
+        if (keys['ArrowRight'] && player.x < canvas.width - player.width) player.x += player.speed;
+
+        for (let i = 0; i < items.length; i++) {
+            items[i].y += items[i].speed;
+
+            // Collision Logic
+            if (items[i].x < player.x + player.width &&
+                items[i].x + items[i].width > player.x &&
+                items[i].y < player.y + player.height &&
+                items[i].y + items[i].height > player.y) {
+                
+                gameActive = false;
+                clearInterval(spawnTimer);
+                showGameOver();
+                return;
+            } 
+
+            if (items[i].y > canvas.height) {
+                items.splice(i, 1);
+                score += 10;
+                scoreLabel.innerText = "Score: " + score;
+                i--;
+            }
+        }
+    }
+
+    function showGameOver() {
+        gameOverScreen.style.display = "block";
+        finalScoreText.innerText = "Final Score: " + score;
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (playerLoaded) {
+            ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
+        } else {
+            ctx.fillStyle = "red";
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+        }
+
+        items.forEach(item => {
+            if (objectLoaded) {
+                ctx.drawImage(objectImg, item.x, item.y, item.width, item.height);
+            } else {
+                ctx.fillStyle = "#32CD32";
+                ctx.fillRect(item.x, item.y, item.width, item.height);
+            }
+        });
+
+        if (gameActive) {
+            requestAnimationFrame(gameLoop);
+        }
+    }
+
+    function gameLoop() {
+        update();
+        draw();
+    }
+
+    // Start Spawning
+    spawnTimer = setInterval(createItem, spawnRate);
+    gameLoop();
+</script>
+</body>
+</html>
